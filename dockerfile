@@ -4,12 +4,13 @@ RUN apk add --no-cache \
     build-base \
     libmicrohttpd-dev \
     lmdb-dev \
-    cjson-dev
+    cjson-dev \
+    util-linux-dev
 
 WORKDIR /app
 COPY . .
 
-RUN gcc -o myapp $(find src -name "*.c") -Iinclude -lmicrohttpd -llmdb
+RUN gcc -o myapp $(find src -name "*.c") -Iinclude -lmicrohttpd -llmdb -lcjson
 
 FROM alpine:latest
 

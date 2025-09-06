@@ -1,0 +1,20 @@
+{
+  "name": "FileHub Dev",
+  "build": {
+    "dockerfile": "../dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "root",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
+      },
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.makefile-tools"
+      ]
+    }
+  }
+}
