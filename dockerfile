@@ -5,7 +5,6 @@ RUN apk add --no-cache \
     libmicrohttpd-dev \
     lmdb-dev \
     cjson-dev \
-    util-linux-dev
 
 WORKDIR /app
 COPY . .
