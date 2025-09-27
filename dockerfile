@@ -4,19 +4,20 @@ RUN apk add --no-cache \
     build-base \
     libmicrohttpd-dev \
     lmdb-dev \
-    cjson-dev \
+    jansson-dev \
+    util-linux-dev
 
 WORKDIR /app
 COPY . .
 
-RUN gcc -o myapp $(find src -name "*.c") -Iinclude -lmicrohttpd -llmdb -lcjson
+RUN gcc -o myapp $(find src -name "*.c") -Iinclude -lmicrohttpd -llmdb -ljansson
 
 FROM alpine:latest
 
 RUN apk add --no-cache \
     libmicrohttpd \
     lmdb \
-    cjson
+    jansson
 
 WORKDIR /app
 COPY --from=builder /app/myapp /app/myapp

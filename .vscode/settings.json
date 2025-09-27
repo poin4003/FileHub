@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "response.h": "c",
+        "jansson.h": "c",
+        "status_codes.h": "c",
+        "user.h": "c",
+        "json.h": "c",
+        "macro.h": "c"
+    }
+}

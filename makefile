@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -Wextra -O2
-LDFLAGS = -lmicrohttpd -llmdb -lcjson
+LDFLAGS = -lmicrohttpd -llmdb -ljansson
 SRC = $(shell find src -name "*.c")
 OBJ = $(SRC:src/%.c=build/%.o)
 BIN = build/myapp
