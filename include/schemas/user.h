@@ -19,5 +19,6 @@ typedef struct
 } user_t;
 
 json_t *user_to_json(const user_t *user);
+user_t *user_from_json(const json_t *root);
 
 #endif

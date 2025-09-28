@@ -17,3 +17,19 @@ json_t *user_to_json(const user_t *user)
 
     return root;
 }
+
+user_t *user_from_json(const json_t *root)
+{
+    if (!root || !json_is_object(root))
+        return NULL;
+
+    user_t *user = malloc(sizeof(user_t));
+    if (!user)
+        return NULL;
+
+#define X(type, name) FROM_JSON_FIELD(user, type, name)
+    USER_FIELDS
+#undef X
+
+    return user;
+}
