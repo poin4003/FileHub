@@ -3,6 +3,7 @@
 
 #include <jansson.h>
 #include "utils/macro.h"
+#include "utils/cleanup.h"
 
 #define USER_FIELDS  \
     X(int, id)       \
@@ -20,5 +21,6 @@ typedef struct
 
 json_t *user_to_json(const user_t *user);
 user_t *user_from_json(const json_t *root);
+void free_user(user_t *user);
 
 #endif

@@ -33,3 +33,15 @@ user_t *user_from_json(const json_t *root)
 
     return user;
 }
+
+void free_user(user_t *user) 
+{
+    if (!user)
+        return;
+
+#define X(type, field) FREE_FIELD(type, user->field)
+    USER_FIELDS
+#undef X
+
+    free(user);
+}
