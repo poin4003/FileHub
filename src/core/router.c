@@ -3,17 +3,18 @@
 #include "utils/hash.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MAX_MIDDLEWARE_CHAIN 10
 #define METHOD_MAP_SIZE 8
 
-typedef struct trie_note_t
+typedef struct trie_node_t
 {
     char *segment;
     int is_param;
 
     struct trie_node_t *children;
-    struct trie_note_t *next_sibling;
+    struct trie_node_t *next_sibling;
 
     handler_func chains[METHOD_COUNT][MAX_MIDDLEWARE_CHAIN];
     int chain_lens[METHOD_COUNT];
@@ -84,7 +85,7 @@ http_method_t parse_method(const char *method)
         if (method_map[pos].key == NULL)
             return HTTP_METHOD_UNKNOWN;
 
-        if (method_map[pos].key == h && strcmp(method_map[pos].key, method) == 0)
+        if (method_map[pos].hash == h && strcmp(method_map[pos].key, method) == 0)
             return method_map[pos].val;
     }
 
@@ -188,7 +189,7 @@ static trie_node_t *find_node_for_url(const char *url, request_t *req)
         return NULL;
 
     trie_node_t *curr = router_root;
-    char *url_copy = strndup(url);
+    char *url_copy = strndup(url, strlen(url));
     if (!url_copy)
         return NULL;
 
@@ -253,7 +254,7 @@ int dispatch_request(struct MHD_Connection *c,
 
     node = find_node_for_url(url, &req);
 
-    if (node || node->chain_lens[method] > 0)
+    if (!node || node->chain_lens[method] <= 0)
     {
         result = bad_request(c, 404, "Not found");
         goto cleanup;

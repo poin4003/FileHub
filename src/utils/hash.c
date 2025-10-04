@@ -1,6 +1,6 @@
 #include "utils/hash.h"
 
-static uint32_t djb2_hash(const char *str)
+uint32_t djb2_hash(const char *str)
 {
     uint32_t hash = 5381;
     unsigned char c;

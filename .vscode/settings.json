@@ -9,6 +9,7 @@
         "string.h": "c",
         "cleanup.h": "c",
         "router.h": "c",
-        "microhttpd.h": "c"
+        "microhttpd.h": "c",
+        "hash.h": "c"
     }
 }

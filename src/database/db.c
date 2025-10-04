@@ -89,7 +89,7 @@ int db_put(const char *key, const char *value)
 
 cleanup:
     if (txn)
-        mdb_txt_abort(txn);
+        mdb_txn_abort(txn);
 
     return rc;
 }
@@ -137,7 +137,7 @@ int db_delete(const char *key)
     MDB_txn *txn = NULL;
     MDB_val mkey;
 
-    rc = mdb_txt_begin(mdb_env, NULL, 0, &txn);
+    rc = mdb_txn_begin(mdb_env, NULL, 0, &txn);
     if (rc != 0)
         goto cleanup;
 
