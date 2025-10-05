@@ -27,7 +27,12 @@ int main(void)
 {
     router_init();
 
-    register_user_routes();
+    handler_func global_middlewares[] = { cors_middleware };
+    
+    router_group_t api_group = router_group(NULL, "/api", global_middlewares, 1);
+    router_group_t user_group = router_group(&api_group, "/users", NULL, 0);
+
+    register_user_routes(&user_group);
 
     struct MHD_Daemon *daemon;
     daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY,

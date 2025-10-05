@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #define MAX_ROUTE_PARAMS 8
+#define MAX_MIDDLEWARE_CHAIN 16
 
 typedef enum
 {
@@ -18,7 +19,8 @@ typedef enum
     METHOD_COUNT
 } http_method_t;
 
-typedef struct {
+typedef struct
+{
     char *key;
     char *value;
 } route_param_t;
@@ -44,10 +46,30 @@ typedef struct request_s
     void *user_data;
 } request_t;
 
+typedef struct router_group_s
+{
+    char prefix[128];
+    handler_func middlewares[MAX_MIDDLEWARE_CHAIN];
+    int mw_count;
+} router_group_t;
+
 void router_init(void);
 void router_free(void);
 
 void router_add_route(
+    http_method_t method,
+    const char *path,
+    handler_func handlers[],
+    int handler_count);
+
+router_group_t router_group(
+    router_group_t *parent,
+    const char *relative_path,
+    handler_func mws[],
+    int mw_count);
+
+void router_group_add_route(
+    router_group_t *group,
     http_method_t method,
     const char *path,
     handler_func handlers[],

@@ -3,6 +3,6 @@
 
 #include "core/router.h"
 
-void register_user_routes(void);
+void register_user_routes(router_group_t *group);
 
 #endif

@@ -8,7 +8,6 @@
 /* ===============================
  * Constants & Config
  * =============================== */
-#define MAX_MIDDLEWARE_CHAIN 10
 #define METHOD_MAP_SIZE 8
 #define MAX_PARAMS 16
 
@@ -27,9 +26,10 @@ typedef struct trie_node_s
     char *segment;
     int is_param;
 
-    struct trie_node_t *children;
-    struct trie_node_t *next_sibling;
+    struct trie_node_s *children;
+    struct trie_node_s *next_sibling;
 
+    handler_chain_t *mw_chain;
     handler_chain_t *chains[METHOD_COUNT];
 } trie_node_t;
 
@@ -55,6 +55,7 @@ typedef struct
 static trie_node_t *router_root = NULL;
 static method_entry_t method_map[METHOD_MAP_SIZE];
 static int method_map_inited = 0;
+static void free_chain(handler_chain_t *chain);
 
 /** Insert a method into hash map */
 static void method_map_insert(const char *key, http_method_t val)
@@ -127,11 +128,13 @@ static trie_node_t *create_note(const char *segment, size_t len)
         return NULL;
 
     node->segment = strndup(segment, len);
-    if (len > 0 && segment[0] == ':')
+    if (!node->segment)
     {
-        node->is_param = 1;
+        free(node);
+        return NULL;
     }
 
+    node->is_param = (segment[0] == ':');
     return node;
 }
 
@@ -141,12 +144,19 @@ void free_trie(trie_node_t *node)
     if (!node)
         return;
 
-    free(node->segment);
-    for (int i = 0; i < METHOD_COUNT; i++)
-        free(node->chains[i]);
+    trie_node_t *child = node->children;
+    while (child)
+    {
+        trie_node_t *next = child->next_sibling;
+        free_trie(child);
+        child = next;
+    }
 
-    free_trie(node->children);
-    free_trie(node->next_sibling);
+    for (int i = 0; i < METHOD_COUNT; ++i)
+        free_chain(node->chains[i]);
+    free_chain(node->mw_chain);
+
+    free(node->segment);
     free(node);
 }
 
@@ -168,23 +178,44 @@ void router_free(void)
     router_root = NULL;
 }
 
+/** Free chain */
+void free_chain(handler_chain_t *chain)
+{
+    if (chain)
+        free(chain);
+}
+
 /** Build chain from group middleware + route hanlders */
 handler_chain_t *build_chain(handler_func group_mws[],
                              handler_func route_handlers[],
-                             int group_len,
-                             int route_len)
+                             int mws_count,
+                             int route_handler_count)
 {
     handler_chain_t *chain = calloc(1, sizeof(handler_chain_t));
     if (!chain)
         return NULL;
 
-    chain->len = 0;
-    for (int i = 0; i < group_len; i++)
+    for (int i = 0; i < mws_count && chain->len < MAX_MIDDLEWARE_CHAIN; ++i)
         chain->handlers[chain->len++] = group_mws[i];
-    for (int i = 0; i < route_len; i++)
+    for (int i = 0; i < route_handler_count && chain->len < MAX_MIDDLEWARE_CHAIN; ++i)
         chain->handlers[chain->len++] = route_handlers[i];
 
     return chain;
+}
+
+/** Assign middlewares to node */
+void trie_add_node_mws(trie_node_t *node, handler_func mws[], int count)
+{
+    if (!node || !mws || count <= 0)
+        return;
+
+    if (node->mw_chain)
+    {
+        free_chain(node->mw_chain);
+        node->mw_chain = NULL;
+    }
+
+    node->mw_chain = build_chain(NULL, mws, 0, count);
 }
 
 /** Add route with handlers */
@@ -197,8 +228,15 @@ void router_add_route(http_method_t method,
         return;
 
     trie_node_t *curr = router_root;
+    trie_node_t *found = NULL;
+    trie_node_t *child = NULL;
+    trie_node_t *prev_sibling = NULL;
+
     char *path_copy = NULL;
     handler_chain_t *new_chain = NULL;
+
+    handler_func collected[MAX_MIDDLEWARE_CHAIN];
+    int collected_len = 0;
 
     path_copy = strdup(path);
     if (!path_copy)
@@ -207,39 +245,49 @@ void router_add_route(http_method_t method,
     char *segment = strtok(path_copy, "/");
     while (segment != NULL)
     {
-        trie_node_t *child = curr->children;
-        trie_node_t *prev_sibling = NULL;
+        child = curr->children;
+        prev_sibling = NULL;
+        found = NULL;
 
-        while (child != NULL)
+        while (child)
         {
             if (strcmp(child->segment, segment) == 0)
             {
-                curr = child;
-                goto next_segment;
+                found = child;
+                break;
             }
             prev_sibling = child;
             child = child->next_sibling;
         }
 
-        trie_node_t *new_node = create_note(segment, strlen(segment));
-        if (!new_node)
-            goto cleanup;
-
-        if (prev_sibling == NULL)
+        if (!found)
         {
-            curr->children = new_node;
-        }
-        else
-        {
-            prev_sibling->next_sibling = new_node;
-        }
-        curr = new_node;
+            trie_node_t *new_node = create_note(segment, strlen(segment));
+            if (!new_node)
+                goto cleanup;
 
-    next_segment:
+            if (prev_sibling)
+                prev_sibling->next_sibling = new_node;
+            else
+                curr->children = new_node;
+
+            found = new_node;
+        }
+
+        curr = found;
+        if (curr->mw_chain)
+        {
+            for (int i = 0; i < curr->mw_chain->len && collected_len < MAX_MIDDLEWARE_CHAIN; ++i)
+                collected[collected_len++] = curr->mw_chain->handlers[i];
+
+            if (collected_len >= MAX_MIDDLEWARE_CHAIN)
+                goto cleanup;
+        }
+
         segment = strtok(NULL, "/");
     }
 
-    new_chain = build_chain(NULL, handlers, 0, handler_count);
+    new_chain = build_chain(collected, handlers, collected_len, handler_count);
     if (!new_chain)
         goto cleanup;
 
@@ -257,6 +305,62 @@ cleanup:
         free(path_copy);
     if (new_chain)
         free(new_chain);
+}
+
+router_group_t router_group(
+    router_group_t *parent,
+    const char *relative_path,
+    handler_func mws[],
+    int mw_count)
+{
+    router_group_t group;
+    memset(&group, 0, sizeof(router_group_t));
+
+    if (parent)
+        snprintf(group.prefix, sizeof(group.prefix), "%s%s", parent->prefix, relative_path);
+    else
+        snprintf(group.prefix, sizeof(group.prefix), "%s", relative_path);
+
+    int total = 0;
+    if (parent)
+    {
+        for (int i = 0; i < parent->mw_count && total < MAX_MIDDLEWARE_CHAIN; ++i)
+            group.middlewares[total++] = parent->middlewares[i];
+    }
+
+    for (int j = 0; j < mw_count && total < MAX_MIDDLEWARE_CHAIN; ++j)
+        group.middlewares[total++] = mws[j];
+
+    group.mw_count = total;
+    return group;
+}
+
+void router_group_add_route(
+    router_group_t *group,
+    http_method_t method,
+    const char *path,
+    handler_func handlers[],
+    int handler_count)
+{
+    if (!group)
+    {
+        router_add_route(method, path, handlers, handler_count);
+        return;
+    }
+
+    char full_path[256];
+    snprintf(full_path, sizeof(full_path), "%s%s", group->prefix, path);
+
+    handler_func combined[MAX_MIDDLEWARE_CHAIN];
+    int total = 0;
+
+    for (int i = 0; i < group->mw_count && total < MAX_MIDDLEWARE_CHAIN; ++i)
+        combined[total++] = group->middlewares[i];
+
+    for (int j = 0; j < handler_count && total < MAX_MIDDLEWARE_CHAIN; ++j)
+        combined[total++] = handlers[j];
+
+    router_add_route(method, full_path, combined, total);
 }
 
 /* ===============================
@@ -301,8 +405,10 @@ find_result_t find_node_and_params(const char *url)
             char *v = strdup(segment);
             if (!k || !v)
             {
-                if (k) free(k);
-                if (v) free(v);
+                if (k)
+                    free(k);
+                if (v)
+                    free(v);
                 curr = NULL;
                 goto cleanup;
             }
@@ -332,7 +438,9 @@ cleanup:
         }
         res.num_params = 0;
         res.node = NULL;
-    } else {
+    }
+    else
+    {
         res.node = curr;
     }
 

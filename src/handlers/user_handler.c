@@ -4,7 +4,6 @@
 #include "schemas/user.h"
 #include "database/db.h"
 #include "core/status_codes.h"
-#include "middlewares/cors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,19 +21,13 @@ int create_user_handler(request_t *req)
     return ok(req->c, 200, "create user successfully", NULL, NULL);
 }
 
-void register_user_routes(void)
+void register_user_routes(router_group_t *group)
 {
     printf("Registering user routes...\n");
 
-    handler_func get_users_chain[] = {
-        cors_middleware,
-        get_user_handler
-    };
-    router_add_route(HTTP_GET, "/users", get_users_chain, 2);
+    handler_func get_users_chain[] = { get_user_handler };
+    router_group_add_route(group, HTTP_GET, "", get_users_chain, 1);
 
-    handler_func create_user_chain[] = {
-        cors_middleware,
-        create_user_handler
-    };
-    router_add_route(HTTP_POST, "/users", create_user_chain, 2);
+    handler_func create_user_chain[] = { create_user_handler };
+    router_group_add_route(group, HTTP_POST, "", create_user_chain, 1);
 }
